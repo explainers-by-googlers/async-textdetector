@@ -1,185 +1,139 @@
-# Explainer for the TODO API
+# Explainer for Asynchronous Creation and Availability Checks for Text Detection API
 
-**Instructions for the explainer author: Search for "todo" in this repository and update all the
-instances as appropriate. For the instances in `index.bs`, update the repository name, but you can
-leave the rest until you start the specification. Then delete the TODOs and this block of text.**
-
-This proposal is an early design sketch by [TODO: team] to describe the problem below and solicit
+This proposal is an early design sketch by Chrome Device API team to describe the problem below and solicit
 feedback on the proposed solution. It has not been approved to ship in Chrome.
 
-TODO: Fill in the whole explainer template below using https://tag.w3.org/explainers/ as a
-reference. Look for [brackets].
-
-## Proponents
-
-- [Proponent team 1]
-- [Proponent team 2]
-- [etc.]
-
 ## Participate
-- https://github.com/explainers-by-googlers/[your-repository-name]/issues
-- [Discussion forum]
+- https://github.com/explainers-by-googlers/async-textdetector/issues
+- https://github.com/WICG/shape-detection-api/issues/109
 
-## Table of Contents [if the explainer is longer than one printed page]
 
-<!-- Update this table of contents by running `npx doctoc README.md` -->
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+## Motivation
 
-- [Introduction](#introduction)
-- [Goals](#goals)
-- [Non-goals](#non-goals)
-- [User research](#user-research)
-- [Use cases](#use-cases)
-  - [Use case 1](#use-case-1)
-  - [Use case 2](#use-case-2)
-- [[Potential Solution]](#potential-solution)
-  - [How this solution would solve the use cases](#how-this-solution-would-solve-the-use-cases)
-    - [Use case 1](#use-case-1-1)
-    - [Use case 2](#use-case-2-1)
-- [Detailed design discussion](#detailed-design-discussion)
-  - [[Tricky design choice #1]](#tricky-design-choice-1)
-  - [[Tricky design choice 2]](#tricky-design-choice-2)
-- [Considered alternatives](#considered-alternatives)
-  - [[Alternative 1]](#alternative-1)
-  - [[Alternative 2]](#alternative-2)
-- [Security and Privacy Considerations](#security-and-privacy-considerations)
-- [Stakeholder Feedback / Opposition](#stakeholder-feedback--opposition)
-- [References & acknowledgements](#references--acknowledgements)
+The current Text Detection API provides a synchronous constructor: new TextDetector().
 
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+This simple, synchronous design does not account for the complex initialization that may be required by underlying Optical Character Recognition (OCR) engines. Many modern, high-quality OCR engines rely on language-specific resources or other dependencies that are not always bundled with the browser.
 
-## Introduction
+This presents three major challenges for web developers:
 
-[The "executive summary" or "abstract".
-Explain in a few sentences what the goals of the project are,
-and a brief overview of how the solution works.
-This should be no more than 1-2 paragraphs.]
+1. Unknown Language Support: There is no way for a developer to programmatically check if the user's browser can detect text in a specific language (e.g., Japanese, Arabic, Russian) before attempting to use the API.
 
-## Goals
+2. Opaque Initialization Process: If the browser needs to download and initialize a language resource, a process which may not be immediate, this process is completely opaque to the developer. It can lead to a "janky" or unresponsive-seeming user experience where the first detect() call is slow to start. Lacking an asynchronous creation method, the developer cannot prevent this "janky" experience.
 
-[What is the **end-user need** which this project aims to address? Make this section short, and
-elaborate in the Use cases section.]
+3. No Cancellation Support: If this hidden initialization takes too long, the developer has no way to cancel it. This can lead to a poor experience if the user navigates away or tries to perform a different action.
 
-## Non-goals
+This proposal aims to create a more robust and predictable API that gives developers the control they need to build high-quality experiences.
 
-[If there are "adjacent" goals which may appear to be in scope but aren't,
-enumerate them here. This section may be fleshed out as your design progresses and you encounter necessary technical and other trade-offs.]
+## Proposed Solution
 
-## User research
+To address these issues, we propose enhancing the TextDetector interface by adopting an asynchronous design, similar to other modern web APIs that handle complex, time-consuming initialization. This availability() and create() pattern is consistent with other proposals that manage complex, on-demand resources, such as the Writing Assistance API and the Translator and Language Detector API.
 
-[If any user research has been conducted to inform your design choices,
-discuss the process and findings. User research should be more common than it is.]
+The proposed changes introduce two new static methods:
 
-## Use cases
+1. TextDetector.availability(options): This static method allows a website to quickly check if the user agent supports text detection for a given set of languages. It returns a status indicating whether the resources are supported by the user agent ("available") or not ("unavailable"). This check does not reveal whether the resources are already downloaded, protecting user privacy.
 
-[Describe in detail what problems end-users are facing, which this project is trying to solve. A
-common mistake in this section is to take a web developer's or server operator's perspective, which
-makes reviewers worry that the proposal will violate [RFC 8890, The Internet is for End
-Users](https://www.rfc-editor.org/rfc/rfc8890).]
+2. TextDetector.create(options): This new, Promise-based factory method replaces the synchronous constructor. It handles the entire setup process, including the asynchronous download (if necessary) and initialization of any required resources. It also provides mechanisms for cancellation (AbortSignal), allowing for a much-improved user experience.
 
-### Use case 1
+These additions will make the Text Detection API significantly more powerful, easier for developers to use correctly, and easier for browser vendors to implement with powerful, on-demand OCR engines.
 
-### Use case 2
+## Detailed Design and Usage Examples
 
-<!-- In your initial explainer, you shouldn't be attached or appear attached to any of the potential
-solutions you describe below this. -->
+### 1. Checking for Language Availability
 
-## [Potential Solution]
-
-[For each related element of the proposed solution - be it an additional JS method, a new object, a new element, a new concept etc., create a section which briefly describes it.]
+Developers can first check if the language(s) they need are supported.
 
 ```js
-// Provide example code - not IDL - demonstrating the design of the feature.
+const status = await TextDetector.availability({ languages: ['ar'] });
 
-// If this API can be used on its own to address a user need,
-// link it back to one of the scenarios in the goals section.
-
-// If you need to show how to get the feature set up
-// (initialized, or using permissions, etc.), include that too.
+if (status === 'available') {
+  console.log('Arabic support is available.');
+} else {
+  console.log('Arabic support is not available.');
+}
 ```
 
-[Where necessary, provide links to longer explanations of the relevant pre-existing concepts and API.
-If there is no suitable external documentation, you might like to provide supplementary information as an appendix in this document, and provide an internal link where appropriate.]
+### 2. Creating a TextDetector (Asynchronously)
 
-[If this is already specced, link to the relevant section of the spec.]
-
-[If spec work is in progress, link to the PR or draft of the spec.]
-
-[If you have more potential solutions in mind, add ## Potential Solution 2, 3, etc. sections.]
-
-### How this solution would solve the use cases
-
-[If there are a suite of interacting APIs, show how they work together to solve the use cases described.]
-
-#### Use case 1
-
-[Description of the end-user scenario]
+The new factory pattern handles the resource-loading (which may or may not involve a download) and allows for cancellation.
 
 ```js
-// Sample code demonstrating how to use these APIs to address that scenario.
+const controller = new AbortController();
+
+// Example: Abort if it takes longer than 15 seconds
+const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+try {
+  const detector = await TextDetector.create({
+    languages: ['ja'],
+    signal: controller.signal
+  });
+  clearTimeout(timeoutId);
+  console.log('Japanese TextDetector is ready.');
+  const texts = await detector.detect(imageElement);
+  console.log(texts);
+} catch (err) {
+  if (err.name === 'AbortError') {
+    console.log('TextDetector creation was cancelled (timeout).');
+  } else {
+    console.error('Failed to create the detector:', err);
+  }
+}
 ```
 
-#### Use case 2
+## Proposed IDL Changes
 
-[etc.]
+Below is the proposed IDL for the enhanced TextDetector interface.
 
-## Detailed design discussion
+```webidl
+[Exposed=Window, SecureContext]
+interface TextDetector {
+  // Static method to check for language support and resource availability.
+  static Promise<AvailabilityStatus> availability(optional TextDetectorOptions options = {});
 
-### [Tricky design choice #1]
+  // Static factory method to create a configured TextDetector instance.
+  static Promise<TextDetector> create(optional TextDetectorCreateOptions options = {});
 
-[Talk through the tradeoffs in coming to the specific design point you want to make.]
+  // Existing instance method.
+  Promise<sequence<DetectedText>> detect(ImageBitmapSource image);
+};
 
-```js
-// Illustrated with example code.
+// --- Availability Checking ---
+
+enum AvailabilityStatus {
+  "unavailable",
+  "available"
+};
+
+// --- Instance Creation and Core Options ---
+
+// Base options for creating a TextDetector or checking availability.
+// The `languages` sequence should contain strings conforming to BCP 47 language codes
+// (e.g., "en-US", "ja", "ar").
+dictionary TextDetectorOptions {
+  // Optional: A hint for the expected language(s) in the image.
+  sequence<DOMString> languages;
+};
+
+// Extends the core options with support for cancellation.
+dictionary TextDetectorCreateOptions : TextDetectorOptions {
+  AbortSignal signal;
+};
 ```
-
-[This may be an open question,
-in which case you should link to any active discussion threads.]
-
-### [Tricky design choice 2]
-
-[etc.]
-
-## Considered alternatives
-
-[This should include as many alternatives as you can,
-from high level architectural decisions down to alternative naming choices.]
-
-### [Alternative 1]
-
-[Describe an alternative which was considered,
-and why you decided against it.]
-
-### [Alternative 2]
-
-[etc.]
 
 ## Security and Privacy Considerations
 
-[Describe any interesting answers you give to the [Security and Privacy Self-Review
-Questionnaire](https://www.w3.org/TR/security-privacy-questionnaire/) and any interesting ways that
-your feature interacts with [Chromium's Web Platform Security
-Guidelines](https://chromium.googlesource.com/chromium/src/+/master/docs/security/web-platform-security-guidelines.md).]
+This proposal introduces one new potential privacy consideration: fingerprinting.
 
-## Stakeholder Feedback / Opposition
+The TextDetector.availability() method reveals information about the language detection capabilities of the user's browser. A site could probe for a wide variety of languages (ja, ar, ko, ru, hi, etc.) and use the list of "available" capabilities as an entropy source to help identify a unique user.
 
-[Implementors and other stakeholders may already have publicly stated positions on this work. If you can, list them here with links to evidence as appropriate.]
+Mitigations:
 
-- [Implementor A] : Positive
-- [Stakeholder B] : No signals
-- [Implementor C] : Negative
-
-[If appropriate, explain the reasons given by other implementors for their concerns.]
+* This design intentionally omits a "downloadable" or similar state. By only exposing "available" and "unavailable", the API avoids the primary fingerprinting vector: user state (i.e., whether a resource is already cached or downloaded). The availability() method only reports the static capabilities of the browser's underlying text detection implementation, not the user's history. This means that all users with the same browser version and implementation will report the same set of supported languages, making it a poor tool for fingerprinting and- significantly reducing the privacy risk.
 
 ## References & acknowledgements
 
-[Your design will change and be informed by many people; acknowledge them in an ongoing way! It helps build community and, as we only get by through the contributions of many, is only fair.]
-
-[Unless you have a specific reason not to, these should be in alphabetical order.]
-
 Many thanks for valuable feedback and advice from:
 
-- [Person 1]
-- [Person 2]
-- [etc.]
+- Matt Reynolds
+- Reilly Grant
+- Domenic Denicola

@@ -1,17 +1,17 @@
 <pre class='metadata'>
-Title: The TODO API
-Shortname: todo
+Title: Explainer for Asynchronous Creation and Availability Checks for Text Detection API
+Shortname:  Asynchronous Creation and Availability Checks for Text Detection API
 Level: None
 Status: w3c/UD
-Repository: explainers-by-googlers/todo-your-repo-name
-URL: https://explainers-by-googlers.github.io/todo-your-repo-name
-Editor: TODO: Your Name, Google https://google.com, TODO@google.com
-Abstract: TODO: A short description of your spec, one or two sentences.
+Repository: explainers-by-googlers/async-textdetector
+URL: https://explainers-by-googlers.github.io/async-textdetector
+Editor: Alvin Ji, Google https://google.com, alvinji@google.com
+Abstract: Asynchronous Creation and Availability Checks for Text Detection API
 Markup Shorthands: markdown yes, css no
 Complain About: accidental-2119 yes, missing-example-ids yes
 Assume Explicit For: yes
 Die On: warning
-WPT Path Prefix: TODO-API-LABEL
+WPT Path Prefix: shape-detection
 WPT Display: closed
 Include MDN Panels: if possible
 Include Can I Use Panels: yes
